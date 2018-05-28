@@ -1,0 +1,71 @@
+variable ami_id {
+  default = "ami-7f43f307"
+}
+
+# Creating example VPC
+resource "aws_vpc" "example" {
+  cidr_block = "10.31.0.0/16"
+}
+
+# Public subnet for Example VPC
+resource "aws_subnet" "public" {
+  vpc_id     = "${aws_vpc.example.id}"
+  cidr_block = "10.31.0.0/24"
+
+  tags {
+    Name = "Public"
+  }
+}
+
+#Private subnet for Example VPC
+resource "aws_subnet" "private" {
+  vpc_id     = "${aws_vpc.example.id}"
+  cidr_block = "10.31.1.0/24"
+
+  tags {
+    Name = "Private"
+  }
+}
+
+resource "aws_security_group" "allow_http" {
+  name        = "Allow http"
+  vpc_id      = "${aws_vpc.example.id}"
+  description = "Allow HTTP for the instances"
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+resource "aws_instance" "master" {
+  ami                    = "${var.ami_id}"
+  instance_type          = "t2.micro"
+  subnet_id              = "${aws_subnet.private.id}"
+  vpc_security_group_ids = ["${aws_security_group.allow_http.id}"]
+
+  tags {
+    Name = "master"
+  }
+}
+
+resource "aws_instance" "slave" {
+  ami                    = "${var.ami_id}"
+  instance_type          = "t2.micro"
+  subnet_id              = "${aws_subnet.private.id}"
+  depends_on             = ["aws_instance.master"]
+  vpc_security_group_ids = ["${aws_security_group.allow_http.id}"]
+
+  tags {
+    Name = "slave"
+  }
+}
